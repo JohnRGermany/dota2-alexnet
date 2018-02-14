@@ -1,15 +1,4 @@
 ################################################################################
-#Michael Guerzhoy and Davi Frossard, 2016
-#AlexNet implementation in TensorFlow, with weights
-#Details:
-#http://www.cs.toronto.edu/~guerzhoy/tf_alexnet/
-#
-#With code from https://github.com/ethereon/caffe-tensorflow
-#Model from  https://github.com/BVLC/caffe/tree/master/models/bvlc_alexnet
-#Weights from Caffe converted using https://github.com/ethereon/caffe-tensorflow
-#
-#
-################################################################################
 
 import os
 import numpy as np
@@ -29,53 +18,45 @@ y = tf.placeholder(tf.float32, (None, ydim))
 keep_rate = tf.placeholder(tf.float32)
 
 #conv1
-#conv(11, 11, 96, 4, 4, padding='VALID', name='conv1', shape=(?, 40, 40, 96))
+#conv(11, 11, 96, 4, 4, padding='SAME', shape=(?, 40, 40, 96))
 k_h = 11; k_w = 11; c_o = 96; s_h = 4; s_w = 4
 conv1 = tf.layers.conv2d(inputs=x, filters=c_o, kernel_size=[k_h, k_w], strides=[s_h, s_w], padding="SAME", activation=tf.nn.relu)
 
-#lrn1
-#lrn(2, 2e-05, 0.75, name='norm1')
-radius = 2; alpha = 2e-05; beta = 0.75; bias = 1.0
-lrn1 = tf.nn.local_response_normalization(conv1, depth_radius=radius, alpha=alpha, beta=beta, bias=bias)
-
 #maxpool1
-#max_pool(3, 3, 2, 2, padding='VALID', name='pool1', shape=(?, 19, 19, 96))
+#max_pool(3, 3, 2, 2, padding='VALID', shape=(?, 19, 19, 96))
 k_h = 3; k_w = 3; s_h = 2; s_w = 2; padding = 'VALID'
-maxpool1 = tf.nn.max_pool(lrn1, ksize=[1, k_h, k_w, 1], strides=[1, s_h, s_w, 1], padding=padding)
+maxpool1 = tf.nn.max_pool(conv1, ksize=[1, k_h, k_w, 1], strides=[1, s_h, s_w, 1], padding=padding)
 
 #conv2
-#conv(5, 5, 256, 1, 1, group=2, name='conv2', shape=(?, 19, 19, 256))
+#conv(5, 5, 256, 1, 1, shape=(?, 19, 19, 256))
 k_h = 5; k_w = 5; c_o = 256; s_h = 1; s_w = 1; group = 2
 conv2 = tf.layers.conv2d(inputs=maxpool1, filters=c_o, kernel_size=[k_h, k_w], padding="SAME", activation=tf.nn.relu)
-#lrn2
-#lrn(2, 2e-05, 0.75, name='norm2')
-radius = 2; alpha = 2e-05; beta = 0.75; bias = 1.0
-lrn2 = tf.nn.local_response_normalization(conv2,
-                                                  depth_radius=radius,
-                                                  alpha=alpha,
-                                                  beta=beta,
-                                                  bias=bias)
 
 #maxpool2
-#max_pool(3, 3, 2, 2, padding='VALID', name='pool2', shape=(?, 9, 9, 256))
+#max_pool(3, 3, 2, 2, padding='VALID', shape=(?, 9, 9, 256))
 k_h = 3; k_w = 3; s_h = 2; s_w = 2; padding = 'VALID'
-maxpool2 = tf.nn.max_pool(lrn2, ksize=[1, k_h, k_w, 1], strides=[1, s_h, s_w, 1], padding=padding)
+maxpool2 = tf.nn.max_pool(conv2, ksize=[1, k_h, k_w, 1], strides=[1, s_h, s_w, 1], padding=padding)
+
 #conv3
-#conv(3, 3, 384, 1, 1, name='conv3', shape=(?, 9, 9, 384))
+#conv(3, 3, 384, 1, 1, shape=(?, 9, 9, 384))
 k_h = 3; k_w = 3; c_o = 384; s_h = 1; s_w = 1; group = 1
 conv3 = tf.layers.conv2d(inputs=maxpool2, filters=c_o, kernel_size=[k_h, k_w], padding="SAME", activation=tf.nn.relu)
+
 #conv4
-#conv(3, 3, 384, 1, 1, group=2, name='conv4', shape=(?, 9, 9, 384))
+#conv(3, 3, 384, 1, 1, shape=(?, 9, 9, 384))
 k_h = 3; k_w = 3; c_o = 384; s_h = 1; s_w = 1; group = 2
 conv4 = tf.layers.conv2d(inputs=conv3, filters=c_o, kernel_size=[k_h, k_w], padding="SAME", activation=tf.nn.relu)
+
 #conv5
-#conv(3, 3, 256, 1, 1, group=2, name='conv5', shape=(?, 9, 9, 256))
+#conv(3, 3, 256, 1, 1, shape=(?, 9, 9, 256))
 k_h = 3; k_w = 3; c_o = 256; s_h = 1; s_w = 1; group = 2
 conv5 = tf.layers.conv2d(inputs=conv4, filters=c_o, kernel_size=[k_h, k_w], padding="SAME", activation=tf.nn.relu)
+
 #maxpool5
-#max_pool(3, 3, 2, 2, padding='VALID', name='pool5', shape=(?, 4, 4, 256))
+#max_pool(3, 3, 2, 2, padding='VALID', shape=(?, 4, 4, 256))
 k_h = 3; k_w = 3; s_h = 2; s_w = 2; padding = 'VALID'
 maxpool5 = tf.nn.max_pool(conv5, ksize=[1, k_h, k_w, 1], strides=[1, s_h, s_w, 1], padding=padding)
+
 #fc6
 #fc(4096, name='fc6')
 reshape = tf.reshape(maxpool5, [-1, 4 * 4 * 256])
@@ -91,10 +72,12 @@ do7 = tf.layers.dropout(inputs=fc7, rate=keep_rate)
 #fc(11, name='fc8')
 fc8 = tf.layers.dense(do7, ydim, activation=tf.nn.relu)
 
-loss = tf.losses.softmax_cross_entropy(onehot_labels=y, logits=fc8)
+tvars = tf.trainable_variables()
+l2 = tf.add_n([tf.nn.l2_loss(v) for v in tvars if 'bias' not in v.name ]) * 0.001
+loss = tf.losses.softmax_cross_entropy(onehot_labels=y, logits=fc8) + l2
 
-lr = .005
-train_op = tf.train.AdamOptimizer(lr).minimize(loss)
+lr = .001
+train_op = tf.train.GradientDescentOptimizer(lr).minimize(loss)
 
 correct_prediction = tf.equal(tf.argmax(fc8,1), tf.argmax(y,1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
@@ -111,8 +94,8 @@ data_folder = 'dota2-dataset'
 images_files = ['train-data-'+str(i) for i in range(4)]
 labels_files = ['train-labels-'+str(i) for i in range(4)]
 
-MAX_EPOCHS = 10
-BATCH_SIZE = 20
+MAX_EPOCHS = 100
+BATCH_SIZE = 64
 
 def batch_generator(images_path, labels_path, batch_size):
     assert os.path.exists(images_path) and os.path.exists(labels_path)
@@ -149,10 +132,10 @@ def batch_generator(images_path, labels_path, batch_size):
         yield image_batch(i)
 
 # Train with files
-for i in range(4):
-    images_path = os.path.join(data_folder, images_files[i])
-    labels_path = os.path.join(data_folder, labels_files[i])
-    for epoch in range(MAX_EPOCHS):
+for epoch in range(MAX_EPOCHS):
+    for i in range(4):
+        images_path = os.path.join(data_folder, images_files[i])
+        labels_path = os.path.join(data_folder, labels_files[i])
         t = time.time()
         l = 0
         j = 0
