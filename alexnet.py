@@ -13,13 +13,9 @@
 
 import os
 import numpy as np
-from scipy.misc import imread
 from PIL import Image
-import glob
-import json
 import time
 import tensorflow as tf
-import random
 
 rows, cols = (160, 160)
 train_x = np.zeros((1, rows, cols, 1)).astype(np.float32)
@@ -145,6 +141,7 @@ train_op = tf.train.AdamOptimizer(lr).minimize(loss)
 prob = tf.nn.softmax(fc8)
 
 init = tf.global_variables_initializer()
+saver = tf.train.Saver()
 sess = tf.Session()
 sess.run(init)
 
@@ -203,9 +200,14 @@ for i in range(4):
     images_path = os.path.join(data_folder, images_files[i])
     labels_path = os.path.join(data_folder, labels_files[i])
     for epoch in range(MAX_EPOCHS):
+        t = time.time()
+        l = 0
+        j = 0
         for images, labels in batch_generator(images_path, labels_path, BATCH_SIZE):
-            logits, _, l = sess.run([fc8, train_op, loss], feed_dict={x: images, y: labels})
-            print(l)
+            _, _, l_k = sess.run([fc8, train_op, loss], feed_dict={x: images, y: labels})
+            j += 1
+            l += ((l_k - l)/j)
+        print('Finsished epoch {0!s} on file {1!s} in {2!s} with avg loss {3!s}'.format(epoch, i,(t-time.time()), l))
 
 # Test accuracy
 images_path = os.path.join(data_folder, 'test-data')
@@ -213,3 +215,7 @@ labels_path = os.path.join(data_folder, 'test-labels')
 for images, labels in batch_generator(images_path, labels_path, 0):
     a = sess.run(accuracy, feed_dict={x: images, y: labels})
     print(a)
+
+# Save
+save_path = saver.save(sess, './models/model.ckpt')
+print('Model saved in path {0!s}'.format(save_path))
