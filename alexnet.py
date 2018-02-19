@@ -2,9 +2,9 @@
 
 import os
 import numpy as np
-from PIL import Image
 import time
 import tensorflow as tf
+import struct
 
 rows, cols = (160, 160)
 train_x = np.zeros((1, rows, cols, 1)).astype(np.float32)
@@ -94,7 +94,7 @@ data_folder = 'dota2-dataset'
 images_files = ['train-data-'+str(i) for i in range(4)]
 labels_files = ['train-labels-'+str(i) for i in range(4)]
 
-MAX_EPOCHS = 100
+MAX_EPOCHS = 250
 BATCH_SIZE = 64
 
 def batch_generator(images_path, labels_path, batch_size):
@@ -102,6 +102,8 @@ def batch_generator(images_path, labels_path, batch_size):
 
     # Read images and labels from file
     with open(images_path, 'rb') as image_file:
+        #magic, num, _, _ = struct.unpack(">iiii", image_file.read(16))
+        #assert magic == 1685025889
         images = np.fromfile(image_file, dtype=np.uint8).reshape(-1, rows, cols, 1)
 
     def one_hot_label(label):
@@ -113,6 +115,8 @@ def batch_generator(images_path, labels_path, batch_size):
         return one_hot
 
     with open(labels_path, 'rb') as labels_file:
+        #magic, num = struct.unpack(">ii", labels_file.read(8))
+        #assert magic == 1685025890
         labels = np.fromfile(labels_file, dtype=np.uint8)
         one_hot_labels = map(one_hot_label, labels)
         labels = np.array(list(one_hot_labels))
@@ -146,12 +150,14 @@ for epoch in range(MAX_EPOCHS):
         print('Finsished epoch {0!s} on file {1!s} in {2!s} with avg loss {3!s}'.format(epoch, i,(time.time()-t), l))
 
 # Test accuracy
+correct_predictions = 0
 images_path = os.path.join(data_folder, 'test-data')
 labels_path = os.path.join(data_folder, 'test-labels')
-for images, labels in batch_generator(images_path, labels_path, 0):
-    a = sess.run(accuracy, feed_dict={x: images, y: labels, keep_rate: 1.0})
-    print(a)
+for images, labels in batch_generator(images_path, labels_path, 1000):
+    c = sess.run(correct_prediction, feed_dict={x: images, y: labels, keep_rate: 1.0})
+    correct_predictions += np.count_nonzero(c == 1)
 
+print('Accuracy: {0!s}'.format(correct_predictions / 19999))
 # Save
 save_path = saver.save(sess, './models/model.ckpt')
 print('Model saved in path {0!s}'.format(save_path))
