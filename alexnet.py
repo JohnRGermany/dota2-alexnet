@@ -5,6 +5,8 @@ import numpy as np
 import time
 import tensorflow as tf
 import struct
+import sys
+import signal
 
 rows, cols = (160, 160)
 train_x = np.zeros((1, rows, cols, 1)).astype(np.float32)
@@ -88,6 +90,14 @@ sess = tf.Session()
 sess.run(init)
 ################################################################################
 
+# Trap SIGINT
+def signal_handler(signal, frame):
+    global training, saver
+    print('Caught SIGINT - Saving then exiting...')
+    save_path = saver.save(sess, './models/model.ckpt')
+    print('Model saved in path {0!s}'.format(save_path))
+    sys.exit(0)
+signal.signal(signal.SIGINT, signal_handler)
 #Training
 
 data_folder = 'dota2-dataset'
@@ -150,6 +160,7 @@ for epoch in range(MAX_EPOCHS):
         print('Finsished epoch {0!s} on file {1!s} in {2!s} with avg loss {3!s}'.format(epoch, i,(time.time()-t), l))
 
 # Test accuracy
+# Split accuracy into batches because of OOM error
 correct_predictions = 0
 images_path = os.path.join(data_folder, 'test-data')
 labels_path = os.path.join(data_folder, 'test-labels')
