@@ -1,1 +1,4 @@
 /dota2-dataset
+/logs
+/__pycache__
+/models

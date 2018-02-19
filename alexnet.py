@@ -7,7 +7,13 @@ import tensorflow as tf
 import struct
 import sys
 import signal
+import datetime
+from logger import Logger
+import json
 
+MAX_EPOCHS = 250
+BATCH_SIZE = 64
+lr = .001
 rows, cols = (160, 160)
 train_x = np.zeros((1, rows, cols, 1)).astype(np.float32)
 train_y = np.zeros((1, 11))
@@ -78,7 +84,6 @@ tvars = tf.trainable_variables()
 l2 = tf.add_n([tf.nn.l2_loss(v) for v in tvars if 'bias' not in v.name ]) * 0.001
 loss = tf.losses.softmax_cross_entropy(onehot_labels=y, logits=fc8) + l2
 
-lr = .001
 train_op = tf.train.GradientDescentOptimizer(lr).minimize(loss)
 
 correct_prediction = tf.equal(tf.argmax(fc8,1), tf.argmax(y,1))
@@ -98,22 +103,31 @@ def signal_handler(signal, frame):
     print('Model saved in path {0!s}'.format(save_path))
     sys.exit(0)
 signal.signal(signal.SIGINT, signal_handler)
-#Training
 
+# Logging
+time_str = datetime.datetime.now().strftime("%b-%d_%H-%M-%S")
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+log_folder = os.path.join('logs', time_str)
+os.makedirs(log_folder)
+params = {'learning_rate': lr, 'batch_size': BATCH_SIZE, 'max_epochs': MAX_EPOCHS}
+with open(os.path.join(log_folder, 'params.json'), 'w') as params_file:
+    json.dump(params, params_file)
+logger = Logger(log_folder)
+
+# Training
+step = 0
 data_folder = 'dota2-dataset'
 images_files = ['train-data-'+str(i) for i in range(4)]
 labels_files = ['train-labels-'+str(i) for i in range(4)]
-
-MAX_EPOCHS = 250
-BATCH_SIZE = 64
 
 def batch_generator(images_path, labels_path, batch_size):
     assert os.path.exists(images_path) and os.path.exists(labels_path)
 
     # Read images and labels from file
     with open(images_path, 'rb') as image_file:
-        #magic, num, _, _ = struct.unpack(">iiii", image_file.read(16))
-        #assert magic == 1685025889
+        magic, num, _, _ = struct.unpack(">iiii", image_file.read(16))
+        assert magic == 1685025889
         images = np.fromfile(image_file, dtype=np.uint8).reshape(-1, rows, cols, 1)
 
     def one_hot_label(label):
@@ -125,8 +139,8 @@ def batch_generator(images_path, labels_path, batch_size):
         return one_hot
 
     with open(labels_path, 'rb') as labels_file:
-        #magic, num = struct.unpack(">ii", labels_file.read(8))
-        #assert magic == 1685025890
+        magic, num = struct.unpack(">ii", labels_file.read(8))
+        assert magic == 1685025890
         labels = np.fromfile(labels_file, dtype=np.uint8)
         one_hot_labels = map(one_hot_label, labels)
         labels = np.array(list(one_hot_labels))
@@ -154,7 +168,9 @@ for epoch in range(MAX_EPOCHS):
         l = 0
         j = 0
         for images, labels in batch_generator(images_path, labels_path, BATCH_SIZE):
-            _, _, l_k = sess.run([fc8, train_op, loss], feed_dict={x: images, y: labels, keep_rate: 0.4})
+            logits, _, l_k = sess.run([fc8, train_op, loss], feed_dict={x: images, y: labels, keep_rate: 0.4})
+            logger.log_scalar('Loss', l_k, step)
+            step += 1
             j += 1
             l += ((l_k - l)/j)
         print('Finsished epoch {0!s} on file {1!s} in {2!s} with avg loss {3!s}'.format(epoch, i,(time.time()-t), l))
